@@ -128,13 +128,15 @@ POWERLEVEL9K_SHORTEN_DIR_LENGTH=2
 
 #Powerlevel9k Prompt elements
 POWERLEVEL9K_LEFT_PROMPT_ELEMENTS=(os_icon root_indicator user kubecontext vcs dir dir_writable)
-POWERLEVEL9K_RIGHT_PROMPT_ELEMENTS=(go_version background_jobs  battery ram time)
+POWERLEVEL9K_RIGHT_PROMPT_ELEMENTS=(background_jobs  battery go_version ram time)
 POWERLEVEL9K_BATTERY_VERBOSE=false
 
 
 #Override gruvbox color overrides
 POWERLEVEL9K_KUBECONTEXT_BACKGROUND='124'
 POWERLEVEL9K_RAM_BACKGROUND='66'
+POWERLEVEL9K_GO_VERSION_BACKGROUND='132'
+POWERLEVEL9K_RAM_BACKGROUND='166'
 
 #Override aliases
 alias ll="ls -alh"
@@ -153,12 +155,22 @@ prestaging () {  export KUBECONFIG=~/.kube/config.prestaging; }
 staging () {  export KUBECONFIG=~/.kube/config.staging; }
 prod () {  export KUBECONFIG=~/.kube/config.prod; }
 integration() { export KUBECONFIG=~/.kube/config.integration; }
+test2() {export KUBECONFIG=~/.kube/config.test2; }
+etcd1() { export KUBECONFIG=~/.kube/config.etcd-test1; }
 dev
 source <(kubectl completion zsh)
 
 # Exports
 export GOPATH="/Users/kpadmanabhan/Desktop/go"
+export TILLER_NAMESPACE="secure-helm"
 
 
 # Misc functions
-busybox_ssh() { echo "kubectl -n run -i --tty busybox --image=yauritux/busybox-curl --restart=Never -- sh  "; }
+busybox_ssh() { echo "kubectl -n $1 run -i --tty busybox --image=nicolaka/netshoot --restart=Never -- sh  "; }
+
+
+# The next line updates PATH for the Google Cloud SDK.
+if [ -f '/Users/kpadmanabhan/Desktop/google-cloud-sdk/path.zsh.inc' ]; then . '/Users/kpadmanabhan/Desktop/google-cloud-sdk/path.zsh.inc'; fi
+
+# The next line enables shell command completion for gcloud.
+if [ -f '/Users/kpadmanabhan/Desktop/google-cloud-sdk/completion.zsh.inc' ]; then . '/Users/kpadmanabhan/Desktop/google-cloud-sdk/completion.zsh.inc'; fi

@@ -1,0 +1,634 @@
+Design philosophy:
+
+* There is one manifest file per service. If multiple services in git repo, multiple manifest file. The following is just 1 manifest file.
+* 3 major sections:
+  - Global              (For all Global config)
+  - Environment based   (For all environment based config)
+  - Dev Declarations (For developers to declare config of their service and tests)
+
+* Few things fall under more than one category. Order of Priority:
+  - If Global and in DevDeclarations, it goes in Global
+  - If Environment based and DevDeclarations, goes in Environment based (Like ContainerArgs and ContainerResources)
+  - Tests are actually split. Definitions of test containers are in Dev Declarations sections, choices weather as to run what tests go in Environment section
+
+* This following manifest file can be easily split into multiple files for more conveniance.
+
+Things to take care of:
+
+  - Global Information
+    - serviceName *
+    - repoName *
+    - prodNamespace *
+    - prometheusRulesFile *
+    - platformApp *
+    - idm *
+    - tolerations *
+    - nodeAffinity *
+    - helmDependencies *
+    - Sealights *
+    - Customize Jenkins Stages !
+    - Canary Rollout Config !
+
+
+  - ENV specific Information
+    - AlertsNotificationConfig *
+    - RBAC access *
+    - DeploymentTimeout *
+    - Replicas *
+    - Max Unavailability *
+    - Discovery Settings *
+    - Resources *
+      - cpu
+      - memory
+      - gp2 storage
+    - Configuration *
+    - ConfigMaps(Tricky as this is K8S specific. CC-OP uses this as it cant use itself to bootstrap itself. Can ignore if we dont plan to support)
+      - As env Variables *
+      - As VolumeMounts *
+    - Tests Suites *
+      - Suite Name
+      - Test Timeout
+    - Helm subChartValues *
+    - Monitoring & Prometheus Rules Variables  *
+    - Multiple feature Namespaces (Config file structure supports it as long as our code understands the different environments) *
+
+
+  - Dev Declarations
+    - Tests *
+    - Containers
+      - Name *
+      - Type *
+      - Args *
+      - Ports & Ingress *
+      - Liveness *
+      - Readiness *
+      - LogFiles *
+      - SharedVolumes !
+
+---
+
+
+metaInfo:
+  serviceName: sample-manifest-app
+  repoName: sample-manifest-app
+  prodNamespace: cc-rjindal
+  prometheusRulesFile: REPOBASE/path/to/rulefile
+  # Certain Fields and defaults cannot be overriden if this is set to true
+  platformApp: false
+  #IDM credentials
+  idm:
+    createOauth: true
+    selfRights:
+      - a
+      - b
+    requiredRights:
+      - a
+      - b
+  # Tolerations
+  tolerations:
+    - key: "dedicated"
+      operator: "Equal"
+      value: "prometheus"
+      effect: "NoSchedule"
+  # Node Affinity
+  nodeAffinity:
+    labels:
+      - instancegroupName: abc
+      - instanceType: bcd
+  helmDependencies:
+    - name: dependency1-cassandra
+      repository: https://repocache.nonprod.ppops.net/artifactory/helm
+      version: 1.30.0
+  sealights:
+    enabled: true
+
+
+
+environmentValues:
+  #Keys here have some meaning (These can be datacenters, clusters, namespaces or a hirearchial mix of them)
+  datacenter1:
+    cluster1:
+      dev-feature:
+        #Alert Setup
+        alertNotificationConfig:
+          email: rjindal@proofpoint.com
+          hipchatRoomId: 7776
+
+        #RBAC access
+        access:
+          adminGroup: sg-sample-admin
+          viewGroup: sg-sample-view
+
+        #Deployment timeouts
+        deploymentTimeout: 300s
+
+        #Replicas
+        replicas: 1
+
+        #Max Unavailability
+        maxUnavailability: 50%
+
+        #DiscoverySettings
+        discovery:
+          enabled: true
+          environment: "something"
+          moreOptions: "somethingElse"
+
+        #Resources
+        resources:
+          containerName: echo-1
+            cpu:
+              min: "400m"
+              max: "3"
+            memory:
+              min: "500Mi"
+              max: "2Gi"
+            storage:
+              type: gp2
+              size: 100
+              path: /path/to/mount
+          containerName: echo-2
+            cpu:
+              min: "400m"
+              max: "3"
+            memory:
+              min: "500Mi"
+              max: "2Gi"
+            storage:
+              type: gp2
+              size: 100
+              path: /path/to/mount
+
+        #Args for containers
+        containerArguments:
+          - containerName: echo-1
+            args:
+              - --log-level=debug
+              - --customInput1="env-feature"
+          - containerName: echo-2
+            args:
+              - --log-level=debug
+              - --customInput2="env-feature"
+          - containerName: test-1
+            args:
+              - --environment=something
+              - --datacenter=something
+              - --kubernetes
+
+        #Config
+        # This should create 'n' confighooks, 'n' configmaps and 'n' volumemounts
+        config:
+          - containerName: echo-1
+            configPath: REPOBASE/path/to/config
+          - containerName: echo-2
+            configPath: REPOBASE/path/to/config
+
+        #ConfigMaps to be used
+        configMaps:
+          - name: configmap-1
+            path: REPOBASE/configmaps/feature/configmap-1.yaml
+            attachContainerName: echo-1
+            attachType: env
+            # If attachment type is 'env', following fields are required
+            configmapKey: configmap-1-variable-1
+            envVariableName: myEnvVariableName
+          - name: configmap-2
+            path: REPOBASE/configmaps/feature/configmap-2.yaml
+            attachContainerName: echo-2
+            attachType: mount
+            # If attachment type is 'mount', following fields are required
+            mountPath: /my/mount/path/in/my/container
+
+        # Choose which Tests to run
+        testSuites:
+          - suiteName: suite-1
+            testTimeout: 500s
+          - suiteName: suite-2
+            testTimeout: 600s
+
+        #Helm subchart values
+        subChartValues:
+          - subchartName: dependency1-cassandra
+            subchartValues:
+              key1: value1
+              key2: value2
+              key3:
+                key4: value4
+
+        #If monitoring true, apply servicemonitor file and Alerts CRD. Not going to differentiate between monitoring and alerting.
+        #If you set monitoring to true, alerts will also be applied
+        monitoring:
+          enabled: true
+            #Template Values for Prometheus rulefile
+            #Apply Alerts CRD with prometheusRulesValues substituted in templates
+          prometheusRulesValues:
+            namespace: service-feature
+            cpuWarningThreashold: 50%
+            memoryWarningThreashold: 50%
+            cpuCriticalThreashold: 70%
+            memeoryCriticalThreashold: 70%
+
+      dev-ci:
+        alertNotificationConfig:
+          email: rjindal@proofpoint.com
+          hipchatRoomId: 7776
+        access:
+          adminGroup: sg-sample-admin
+          viewGroup: sg-sample-view
+        deploymentTimeout: 300s
+        replicas: 1
+        maxUnavailability: 40%
+        discovery:
+          enabled: true
+          environment: "something"
+          moreOptions: "somethingElse"
+        resources:
+          containerName: echo-1
+            cpu:
+              min: "400m"
+              max: "3"
+            memory:
+              min: "500Mi"
+              max: "2Gi"
+            storage:
+              type: gp2
+              size: 100
+              path: /path/to/mount
+          containerName: echo-2
+            cpu:
+              min: "400m"
+              max: "3"
+            memory:
+              min: "500Mi"
+              max: "2Gi"
+            storage:
+              type: gp2
+              size: 100
+              path: /path/to/mount
+        containerArguments:
+          - containerName: echo-1
+            args:
+              - --log-level=debug
+              - --customInput1="env-ci"
+          - containerName: echo-2
+            args:
+              - --log-level=debug
+              - --customInput2="env-ci"
+        config:
+          - containerName: echo-1
+            configPath: REPOBASE/path/to/config
+          - containerName: echo-2
+            configPath: REPOBASE/path/to/config
+        testSuites:
+          - suiteName: suite-1
+            testTimeout: 300s
+          - suiteName: suite-2
+            testTimeout: 500s
+        subChartValues:
+          - subchartName: dependency1-cassandra
+            subchartValues:
+              key1: value1
+              key2: value2
+              key3:
+                key4: value4
+        monitoring:
+          enabled: true
+          prometheusRulesValues:
+            namespace: service-ci
+            cpuWarningThreashold: 60%
+            memoryWarningThreashold: 60%
+            cpuCriticalThreashold: 75%
+            memeoryCriticalThreashold: 75%
+  datacenter1:
+    cluster2:
+      prestaging:
+        alertNotificationConfig:
+          email: rjindal@proofpoint.com
+          hipchatRoomId: 7776
+        access:
+          adminGroup: sg-sample-admin
+          viewGroup: sg-sample-view
+        deploymentTimeout: 300s
+        replicas: 3
+        maxUnavailability: 30%
+        discovery:
+          enabled: true
+          environment: "something"
+          moreOptions: "somethingElse"
+        resources:
+          containerName: echo-1
+            cpu:
+              min: "400m"
+              max: "3"
+            memory:
+              min: "500Mi"
+              max: "2Gi"
+            storage:
+              type: gp2
+              size: 100
+              path: /path/to/mount
+          containerName: echo-2
+            cpu:
+              min: "400m"
+              max: "3"
+            memory:
+              min: "500Mi"
+              max: "2Gi"
+            storage:
+              type: gp2
+              size: 100
+              path: /path/to/mount
+        containerArguments:
+          - containerName: echo-1
+            args:
+              - --log-level=debug
+              - --customInput1="env-prestaging"
+          - containerName: echo-2
+            args:
+              - --log-level=debug
+              - --customInput2="env-prestaging"
+        config:
+          - containerName: echo-1
+            configPath: REPOBASE/path/to/config
+          - containerName: echo-2
+            configPath: REPOBASE/path/to/config
+        testSuites:
+          - suiteName: suite-1
+            testTimeout: 500s
+        subChartValues:
+          - subchartName: dependency1-cassandra
+            subchartValues:
+              key1: value55
+              key2: value21
+              key3:
+                key4: value43
+        monitoring:
+          enabled: true
+          prometheusRulesValues:
+            namespace: service
+            cpuWarningThreashold: 60%
+            memoryWarningThreashold: 60%
+            cpuCriticalThreashold: 80%
+            memeoryCriticalThreashold: 80%
+
+  datacenter1:
+    cluster2:
+      staging:
+        alertNotificationConfig:
+          email: rjindal@proofpoint.com
+          hipchatRoomId: 7776
+        access:
+          adminGroup: sg-sample-admin
+          viewGroup: sg-sample-view
+        deploymentTimeout: 300s
+        replicas: 5
+        maxUnavailability: 20%
+        discovery:
+          enabled: true
+          environment: "something"
+          moreOptions: "somethingElse"
+        resources:
+          containerName: echo-1
+            cpu:
+              min: "400m"
+              max: "3"
+            memory:
+              min: "500Mi"
+              max: "2Gi"
+            storage:
+              type: gp2
+              size: 100
+              path: /path/to/mount
+          containerName: echo-2
+            cpu:
+              min: "400m"
+              max: "3"
+            memory:
+              min: "500Mi"
+              max: "2Gi"
+            storage:
+              type: gp2
+              size: 100
+              path: /path/to/mount
+        containerArguments:
+          - containerName: echo-1
+            args:
+              - --log-level=debug
+              - --customInput1="env-staging"
+          - containerName: echo-2
+            args:
+              - --log-level=debug
+              - --customInput2="env-staging"
+        config:
+          - containerName: echo-1
+            configPath: REPOBASE/path/to/config
+          - containerName: echo-2
+            configPath: REPOBASE/path/to/config
+        testSuites:
+          - suiteName: suite-2
+            testTimeout: 600s
+        subChartValues:
+          - subchartName: dependency1-cassandra
+            subchartValues:
+              key1: value553
+              key2: value213
+              key3:
+                key4: value432
+        monitoring:
+          enabled: true
+          prometheusRulesValues:
+            namespace: service
+            cpuWarningThreashold: 60%
+            memoryWarningThreashold: 60%
+            cpuCriticalThreashold: 80%
+            memeoryCriticalThreashold: 80%
+
+  datacenter2:
+    cluster1:
+      prod:
+        alertNotificationConfig:
+          email: rjindal@proofpoint.com
+          hipchatRoomId: 7776
+        access:
+          adminGroup: sg-sample-admin
+          viewGroup: sg-sample-view
+        deploymentTimeout: 300s
+        replicas: 10
+        maxUnavailability: 10%
+        discovery:
+          enabled: true
+          environment: "something"
+          moreOptions: "somethingElse"
+          resources:
+            containerName: echo-1
+              cpu:
+                min: "400m"
+                max: "3"
+              memory:
+                min: "500Mi"
+                max: "2Gi"
+              storage:
+                type: gp2
+                size: 100
+                path: /path/to/mount
+            containerName: echo-2
+              cpu:
+                min: "400m"
+                max: "3"
+              memory:
+                min: "500Mi"
+                max: "2Gi"
+              storage:
+                type: gp2
+                size: 100
+                path: /path/to/mount
+        containerArguments:
+          - containerName: echo-1
+            args:
+              - --log-level=debug
+              - --customInput1="env-prod"
+          - containerName: echo-2
+            args:
+              - --log-level=debug
+              - --customInput2="env-prod"
+        config:
+          - containerName: echo-1
+            configPath: REPOBASE/path/to/config
+          - containerName: echo-2
+            configPath: REPOBASE/path/to/config
+        ###Production has no TestSuites section###
+        subChartValues:
+          - subchartName: dependency1-cassandra
+            subchartValues:
+              key1: value511
+              key2: value211
+              key3:
+                key4: value411
+        monitoring:
+          enabled: true
+          prometheusRulesValues:
+            namespace: service
+            cpuWarningThreashold: 60%
+            memoryWarningThreashold: 60%
+            cpuCriticalThreashold: 80%
+            memeoryCriticalThreashold: 80%
+
+
+
+devDeclarartions:
+  # To-Do
+  sharedVolumes: {}
+  # Test Containers
+  tests:
+    # Each suite is a separate Helm chart?
+    suites:
+      - name: suite-1
+        restartPolicy: Never
+        annotations:
+          helm.sh/hook: "test-success"
+        dockerfiles:
+          - name: test-1
+            type: long-running
+            path: REPOBASE/tests/1/Dockerfile
+            contextPath: REPOBASE/
+          - name: test-1-init
+            type: init
+            path: REPOBASE/tests/2/Dockerfile
+            contextPath: REPOBASE/
+      - name: suite-2
+        restartPolicy: Always
+        annotations:
+          helm.sh/hook: "test-success"
+        dockerfiles:
+          - name: test-2
+            type: long-running
+            path: REPOBASE/tests/3/Dockerfile
+            contextPath: REPOBASE/
+          - name: test-2-init
+            type: init
+            path: REPOBASE/tests/4/Dockerfile
+            contextPath: REPOBASE/
+  # Service Containers
+  service:
+    dockerfiles:
+      - name: echo-1
+        path: REPOBASE/src/1/Dockerfile
+        contextPath: REPOBASE/
+        type: long-running
+        ports:
+          ### By default all ports here will be ClusterIP ###
+          - name: admin1
+            port: 5555
+            ingress:
+              enabled: true
+              prefix: "service-admin1"
+              type: internal
+              secureBackend: "false"
+          - name: http1
+            port: 8080
+            ingress:
+              enabled: true
+              prefix: "service-http1"
+              type: corp
+              secureBackend: "false"
+        # Liveness Probe on per container basis
+        livenessProbe:
+          exec:
+            command:
+            - cat
+            - /tmp/healthy
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        # Readiness Probe on per container basis
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 5555
+          initialDelaySeconds: 3
+          periodSeconds: 3
+        logfiles:
+          - /path/to/logfile
+
+      - name: echo-2
+        path: REPOBASE/src/2/Dockerfile
+        contextPath: REPOBASE/
+        type: long-running
+        ports:
+          # Names of ports have to be Unique
+          - name: admin2
+            port: 5556
+            #If ingress block not present, assume default and dont expose
+            ingress:
+              enabled: false
+          - name: http2
+            port: 8080
+            ingress:
+              enabled: true
+              prefix: "service-http2"
+              type: internal
+              secureBackend: "true"
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 3
+          periodSeconds: 3
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: 8080
+          initialDelaySeconds: 3
+          periodSeconds: 3
+        logfiles:
+          - /path/to/file
+          - /path/to/file2
+
+
+      - name: echo-3
+        path: REPOBASE/src/3/Dockerfile
+        contextPath: REPOBASE/
+        type: init
+        logfiles:
+          - /path/to/file3
+          - /path/to/file4
+        # No Ports in init container?

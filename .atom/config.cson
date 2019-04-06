@@ -1,0 +1,47 @@
+"*":
+  "activate-power-mode":
+    plugins:
+      playAudio: true
+      screenShake: true
+  "atom-ide-ui":
+    "atom-ide-code-format":
+      formatOnSave: true
+  "autocomplete-python":
+    useKite: false
+  core:
+    disabledPackages: [
+      "python-debugger"
+    ]
+    telemetryConsent: "no"
+    themes: [
+      "atom-dark-ui"
+      "monokai"
+    ]
+  editor:
+    fontSize: 17
+  "exception-reporting":
+    userId: "720c271b-e569-4018-aaa9-26ab20ea3573"
+  "go-plus":
+    config:
+      compileOnSave: false
+    format:
+      tool: "gofmt"
+    lint:
+      args: [
+        "--vendor"
+        "--disable-all"
+        "--enable=vet"
+        "--enable=vetshadow"
+        "--enable=ineffassign"
+        "--enable=goconst"
+        "--tests"
+        "--json"
+        "."
+      ]
+  "linter-ui-default":
+    panelHeight: 300
+  "platformio-ide-terminal":
+    style:
+      fontFamily: "Hack Nerd Font"
+      theme: "solarized-dark"
+  "tree-view": {}
